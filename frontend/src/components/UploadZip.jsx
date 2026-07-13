@@ -2,56 +2,57 @@ import { useState } from "react";
 import api from "../api/api";
 
 function UploadZip({ onProjectLoaded }) {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState(false);
   const [files, setFiles] = useState([]);
 
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+  function handleFileChange(e) {
+    setFile(e.target.files[0]);
     setMessage("");
     setFiles([]);
-  };
+  }
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setMessage("Please select a ZIP file first.");
-      setIsError(true);
+  async function handleUpload() {
+    if (!file) {
+      setMessage("Please select a ZIP file.");
+      setError(true);
       return;
     }
 
     const formData = new FormData();
-    formData.append("file", selectedFile);
+    formData.append("file", file);
 
-    setIsUploading(true);
+    setLoading(true);
     setMessage("");
-    setIsError(false);
+    setError(false);
 
     try {
-      const response = await api.post("/api/upload-zip", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const res = await api.post("/api/upload-zip", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       setMessage(
-        `${response.data.message} (${response.data.total_files} files loaded)`
+        `${res.data.message} (${res.data.total_files} files loaded)`
       );
-      setIsError(false);
-      setFiles(response.data.files);
 
-      // Notify parent component (App.jsx) that a project is now loaded
+      setFiles(res.data.files);
+
       if (onProjectLoaded) {
-        onProjectLoaded(response.data.files);
+        onProjectLoaded(res.data.files);
       }
-    } catch (error) {
-      const errorMsg =
-        error.response?.data?.detail || "Failed to upload ZIP file.";
-      setMessage(errorMsg);
-      setIsError(true);
+    } catch (err) {
+      setMessage(
+        err.response?.data?.detail || "Failed to upload ZIP file."
+      );
+      setError(true);
     } finally {
-      setIsUploading(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl">
@@ -69,17 +70,17 @@ function UploadZip({ onProjectLoaded }) {
 
         <button
           onClick={handleUpload}
-          disabled={isUploading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400"
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {isUploading ? "Uploading..." : "Upload"}
+          {loading ? "Uploading..." : "Upload"}
         </button>
       </div>
 
       {message && (
         <p
           className={`text-sm mb-3 ${
-            isError ? "text-red-600" : "text-green-600"
+            error ? "text-red-600" : "text-green-600"
           }`}
         >
           {message}
@@ -89,16 +90,19 @@ function UploadZip({ onProjectLoaded }) {
       {files.length > 0 && (
         <div className="mt-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">
-            Loaded Files ({files.length}):
+            Loaded Files ({files.length})
           </h3>
+
           <div className="max-h-64 overflow-y-auto border rounded-md p-2 bg-gray-50">
-            {files.map((f, idx) => (
+            {files.map((item, index) => (
               <div
-                key={idx}
+                key={index}
                 className="flex justify-between text-xs text-gray-600 py-1 border-b last:border-b-0"
               >
-                <span>{f.path}</span>
-                <span className="text-gray-400">{f.lines} lines</span>
+                <span>{item.path}</span>
+                <span className="text-gray-400">
+                  {item.lines} lines
+                </span>
               </div>
             ))}
           </div>
