@@ -13,7 +13,12 @@ from services.file_service import (
     read_project_files,
 )
 from services.github_service import clone_github_repo
-from services.rag_service import build_vector_store
+from services.rag_service import build_vector_store, is_project_indexed
+from services.chat_service import (
+    ask_question,
+    clear_conversation_history,
+    get_conversation_history,
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -34,6 +39,11 @@ app.add_middleware(
 class GithubImportRequest(BaseModel):
     """Request body schema for importing a GitHub repository."""
     repo_url: str
+
+
+class ChatRequest(BaseModel):
+    """Request body schema for asking a question about the codebase."""
+    question: str
 
 
 @app.get("/")
@@ -58,6 +68,7 @@ async def upload_zip(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed")
 
     clear_workspace()
+    clear_conversation_history()  # new project -> old chat no longer relevant
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_zip:
         shutil.copyfileobj(file.file, temp_zip)
@@ -97,6 +108,8 @@ def import_github(request: GithubImportRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    clear_conversation_history()  # new project -> old chat no longer relevant
+
     files_info = read_project_files()
 
     if len(files_info) == 0:
@@ -129,8 +142,7 @@ def list_current_files():
 @app.post("/api/index-project")
 def index_project():
     """
-    Runs the full RAG indexing pipeline on the currently loaded project:
-    reads files -> splits into chunks -> embeds -> stores in ChromaDB.
+    Runs the full RAG indexing pipeline on the currently loaded project.
     """
     try:
         result = build_vector_store()
@@ -142,9 +154,64 @@ def index_project():
             detail=f"Indexing failed: {str(e)}",
         )
 
+    clear_conversation_history()  # fresh index -> start chat fresh too
+
     return {
         "status": "success",
         "message": "Project indexed successfully",
         "total_files": result["total_files"],
         "total_chunks": result["total_chunks"],
+    }
+
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+    """
+    Answers a question about the currently indexed codebase using
+    a LangGraph RAG workflow (retrieve -> generate), with conversation history.
+    """
+    if not request.question or not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+
+    if not is_project_indexed():
+        raise HTTPException(
+            status_code=400,
+            detail="No project has been indexed yet. Please index a project first.",
+        )
+
+    try:
+        result = ask_question(request.question.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+    return {
+        "status": "success",
+        "answer": result["answer"],
+        "sources": result["sources"],
+    }
+
+
+@app.get("/api/chat/history")
+def chat_history():
+    """
+    Returns the current conversation history.
+    Useful if the frontend ever needs to reload/restore the chat.
+    """
+    return {
+        "status": "success",
+        "history": get_conversation_history(),
+    }
+
+
+@app.post("/api/chat/clear")
+def chat_clear():
+    """
+    Clears the current conversation history, starting a fresh chat.
+    """
+    clear_conversation_history()
+    return {
+        "status": "success",
+        "message": "Conversation history cleared",
     }

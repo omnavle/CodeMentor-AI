@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import api from "./api/api";
 import UploadZip from "./components/UploadZip";
 import ImportGithub from "./components/ImportGithub";
+import IndexProject from "./components/IndexProject";
+import ChatBox from "./components/ChatBox";
 
 function App() {
   const [status, setStatus] = useState("Checking backend connection...");
   const [isConnected, setIsConnected] = useState(false);
   const [projectFiles, setProjectFiles] = useState([]);
+  const [isIndexed, setIsIndexed] = useState(false);
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -25,6 +28,11 @@ function App() {
 
   const handleProjectLoaded = (files) => {
     setProjectFiles(files);
+    setIsIndexed(false); // a new project was loaded, so old index is no longer valid
+  };
+
+  const handleIndexed = () => {
+    setIsIndexed(true);
   };
 
   return (
@@ -48,10 +56,15 @@ function App() {
       <ImportGithub onProjectLoaded={handleProjectLoaded} />
 
       {projectFiles.length > 0 && (
-        <p className="text-sm text-gray-500">
-          ✅ {projectFiles.length} files ready to be indexed (coming in a later milestone)
-        </p>
+        <>
+          <p className="text-sm text-gray-500">
+            ✅ {projectFiles.length} files loaded and ready to index
+          </p>
+          <IndexProject onIndexed={handleIndexed} />
+        </>
       )}
+
+      {isIndexed && <ChatBox />}
     </div>
   );
 }

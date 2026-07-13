@@ -1,8 +1,8 @@
 import os
 import shutil
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
@@ -48,11 +48,7 @@ def build_vector_store():
     """
     Reads all files from the current workspace, splits them into chunks,
     generates embeddings for each chunk, and stores them in ChromaDB.
-
-    Returns a summary: how many files were processed and how many
-    chunks were created.
     """
-    # Step 1: Read all source files with their full content
     files = read_project_files_with_content()
 
     if len(files) == 0:
@@ -60,9 +56,6 @@ def build_vector_store():
             "No files found to index. Upload a ZIP or import a GitHub repo first."
         )
 
-    # Step 2: Convert each file into a LangChain Document object.
-    # metadata["source"] keeps track of which file the text came from,
-    # so later we can tell the user "this answer came from utils.py".
     documents = []
     for file in files:
         doc = Document(
@@ -71,20 +64,14 @@ def build_vector_store():
         )
         documents.append(doc)
 
-    # Step 3: Split each document into smaller chunks.
-    # chunk_size = max number of characters per chunk.
-    # chunk_overlap = characters shared between consecutive chunks,
-    # so we don't lose context right at the boundary of a chunk.
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
     )
     chunks = splitter.split_documents(documents)
 
-    # Step 4: Clear any old embeddings from a previous project
     clear_vector_store()
 
-    # Step 5: Generate embeddings for every chunk and store them in ChromaDB
     embeddings = get_embeddings()
     Chroma.from_documents(
         documents=chunks,
@@ -102,8 +89,6 @@ def build_vector_store():
 def get_vector_store():
     """
     Loads the existing ChromaDB vector store from disk.
-    This will be used in Milestone 5 to search for relevant
-    chunks when the user asks a question.
     """
     embeddings = get_embeddings()
     return Chroma(
@@ -111,3 +96,28 @@ def get_vector_store():
         embedding_function=embeddings,
         persist_directory=CHROMA_DIR,
     )
+
+
+def is_project_indexed() -> bool:
+    """
+    Checks whether a ChromaDB index already exists on disk.
+    Used by the chat endpoint to give a clear error if the
+    user tries to chat before indexing a project.
+    """
+    if not os.path.exists(CHROMA_DIR):
+        return False
+
+    # A valid Chroma store will have created a sqlite file inside
+    sqlite_path = os.path.join(CHROMA_DIR, "chroma.sqlite3")
+    return os.path.exists(sqlite_path)
+
+
+def search_relevant_chunks(query: str, k: int = 4):
+    """
+    Searches the vector store for the top-k chunks most relevant
+    to the user's question. Returns LangChain Document objects,
+    each with page_content and metadata (source file path).
+    """
+    vector_store = get_vector_store()
+    results = vector_store.similarity_search(query, k=k)
+    return results
