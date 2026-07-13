@@ -1,4 +1,5 @@
 import os
+import stat
 import shutil
 import zipfile
 
@@ -24,13 +25,26 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE_BYTES = 500_000  # ~500 KB
 
 
+def _remove_readonly(func, path, exc_info):
+    """
+    Error handler for shutil.rmtree on Windows.
+
+    Git marks some files inside .git/objects as read-only.
+    When rmtree tries to delete them, Windows blocks it with
+    PermissionError. This handler removes the read-only flag
+    and retries the delete operation.
+    """
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
 def clear_workspace():
     """
     Deletes any previously loaded project so we always
     start fresh with the newly uploaded/imported project.
     """
     if os.path.exists(WORKSPACE_DIR):
-        shutil.rmtree(WORKSPACE_DIR)
+        shutil.rmtree(WORKSPACE_DIR, onerror=_remove_readonly)
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
 
