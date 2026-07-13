@@ -1,6 +1,30 @@
-fastapi
-uvicorn[standard]
-python-dotenv
-pydantic
-python-multipart
-GitPython
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+
+# Environment
+.env
+backend/.env
+frontend/.env
+
+# Generated workspace
+backend/workspace/
+backend/uploads/
+backend/projects/
+backend/chroma_db/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

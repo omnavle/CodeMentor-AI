@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "./api/api";
 import UploadZip from "./components/UploadZip";
+import ImportGithub from "./components/ImportGithub";
 
 function App() {
   const [status, setStatus] = useState("Checking backend connection...");
@@ -41,6 +42,10 @@ function App() {
       </div>
 
       <UploadZip onProjectLoaded={handleProjectLoaded} />
+
+      <div className="text-gray-400 text-sm">— OR —</div>
+
+      <ImportGithub onProjectLoaded={handleProjectLoaded} />
 
       {projectFiles.length > 0 && (
         <p className="text-sm text-gray-500">
