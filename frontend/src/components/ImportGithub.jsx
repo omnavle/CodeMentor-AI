@@ -24,19 +24,14 @@ function ImportGithub({ onProjectLoaded }) {
         repo_url: repoUrl.trim(),
       });
 
-      setMessage(
-        `${res.data.message} (${res.data.total_files} files loaded)`
-      );
-
+      setMessage(`Imported (${res.data.total_files} files)`);
       setFiles(res.data.files);
 
       if (onProjectLoaded) {
         onProjectLoaded(res.data.files);
       }
     } catch (err) {
-      setMessage(
-        err.response?.data?.detail || "Failed to import repository."
-      );
+      setMessage(err.response?.data?.detail || "Failed to import repository.");
       setError(true);
     } finally {
       setLoading(false);
@@ -44,57 +39,46 @@ function ImportGithub({ onProjectLoaded }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
-        🌐 Import Public GitHub Repository
-      </h2>
+    <div className="github-box">
+      <h3 className="github-title">🌐 Import GitHub Repo</h3>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="github-input-box">
+        <span className="github-icon">🔗</span>
+
         <input
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="https://github.com/user/repo"
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="github-input"
         />
-
-        <button
-          onClick={handleImport}
-          disabled={loading}
-          className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm hover:bg-purple-700 disabled:bg-gray-400"
-        >
-          {loading ? "Importing..." : "Import"}
-        </button>
       </div>
 
+      <button className="github-btn" onClick={handleImport} disabled={loading}>
+        {loading ? "Importing..." : "Import Repository"}
+      </button>
+
       {message && (
-        <p
-          className={`text-sm mb-3 ${
-            error ? "text-red-600" : "text-green-600"
-          }`}
-        >
+        <div className={error ? "alert error" : "alert success"}>
           {message}
-        </p>
+        </div>
       )}
 
       {files.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">
-            Loaded Files ({files.length})
-          </h3>
+        <div className="files-card">
+          <h4>Files ({files.length})</h4>
 
-          <div className="max-h-64 overflow-y-auto border rounded-md p-2 bg-gray-50">
-            {files.map((file, index) => (
-              <div
-                key={index}
-                className="flex justify-between text-xs text-gray-600 py-1 border-b last:border-b-0"
-              >
-                <span>{file.path}</span>
-                <span className="text-gray-400">
-                  {file.lines} lines
-                </span>
+          <div className="files-list">
+            {files.slice(0, 8).map((item, index) => (
+              <div key={index} className="file-row">
+                <span>📄 {item.path}</span>
+                <span>{item.lines} ln</span>
               </div>
             ))}
+
+            {files.length > 8 && (
+              <div className="more-files">+ {files.length - 8} more...</div>
+            )}
           </div>
         </div>
       )}

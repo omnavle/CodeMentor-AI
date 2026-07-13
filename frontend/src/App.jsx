@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "./api/api";
 
 import UploadZip from "./components/UploadZip";
@@ -14,9 +14,6 @@ function App() {
 
   const [files, setFiles] = useState([]);
   const [indexed, setIndexed] = useState(false);
-
-  const indexRef = useRef(null);
-  const chatRef = useRef(null);
 
   useEffect(() => {
     async function checkBackend() {
@@ -36,150 +33,92 @@ function App() {
   function handleProjectLoaded(projectFiles) {
     setFiles(projectFiles);
     setIndexed(false);
-
-    setTimeout(() => {
-      indexRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 500);
   }
 
   function handleIndexed() {
     setIndexed(true);
-
-    setTimeout(() => {
-      chatRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 700);
   }
+
+  const projectReady = files.length > 0;
+  const chatReady = projectReady && indexed;
 
   return (
     <div className="app">
-
       <div className="blob blob1"></div>
       <div className="blob blob2"></div>
       <div className="blob blob3"></div>
 
-      <section className="hero">
+      <header className="topbar">
+        <h1>🤖 AI Code Mentor</h1>
 
-        <div className="hero-badge">
-          AI Powered RAG Assistant
-        </div>
-
-        <h1>
-          AI Code Mentor
-        </h1>
-
-        <p>
-          Upload a ZIP or Import any Public GitHub Repository.
-          <br />
-          Build embeddings and chat with your code using AI.
-        </p>
-
-        <div
-          className={`status ${
-            connected ? "online" : "offline"
-          }`}
-        >
+        <div className={`status ${connected ? "online" : "offline"}`}>
           {connected ? "🟢" : "🔴"} {status}
         </div>
+      </header>
 
-      </section>
+      <section className="workspace">
+        {/* LEFT SIDE */}
+        <div className="workspace-left">
+          <div className="glass-card compact">
+            <h2 className="mini-title">Choose Your Project</h2>
 
-      <section className="features">
+            <UploadZip onProjectLoaded={handleProjectLoaded} />
 
-        <div className="feature-card">
-          ⚡
-          <h3>AI Powered</h3>
-          <p>Gemini + LangChain</p>
-        </div>
-
-        <div className="feature-card">
-          📂
-          <h3>ZIP Upload</h3>
-          <p>Import any project</p>
-        </div>
-
-        <div className="feature-card">
-          🌐
-          <h3>GitHub Import</h3>
-          <p>Clone public repositories</p>
-        </div>
-
-        <div className="feature-card">
-          🧠
-          <h3>Semantic Search</h3>
-          <p>Powered by RAG</p>
-        </div>
-
-      </section>
-
-      <section className="glass-card">
-
-        <h2>Choose Your Project</h2>
-
-        <UploadZip onProjectLoaded={handleProjectLoaded} />
-
-        <div className="divider">
-          <span>OR</span>
-        </div>
-
-        <ImportGithub onProjectLoaded={handleProjectLoaded} />
-
-      </section>
-
-      {files.length > 0 && (
-        <section
-          ref={indexRef}
-          className="glass-card fade"
-        >
-
-          <div className="step">
-            ✅ Project Loaded
-          </div>
-
-          <div className="summary">
-
-            <div>
-              <h3>{files.length}</h3>
-              <p>Files</p>
+            <div className="divider small">
+              <span>OR</span>
             </div>
 
-            <div>
-              <h3>Ready</h3>
-              <p>Status</p>
-            </div>
+            <ImportGithub onProjectLoaded={handleProjectLoaded} />
 
-            <div>
-              <h3>AI</h3>
-              <p>Embeddings</p>
-            </div>
+            {projectReady && (
+              <div className="mini-status fade">
+                <div className="mini-status-row">
+                  <span>
+                    📁 <strong>{files.length}</strong> Files
+                  </span>
+                  <span className="dot-sep">•</span>
+                  <span>{indexed ? "✅ Indexed" : "⏳ Not Indexed"}</span>
+                  <span className="dot-sep">•</span>
+                  <span>🧠 AI Embeddings</span>
+                </div>
 
+                <IndexProject onIndexed={handleIndexed} />
+              </div>
+            )}
           </div>
+        </div>
 
-          <IndexProject onIndexed={handleIndexed} />
+        {/* RIGHT SIDE */}
+        <div className="workspace-right">
+          <div className="glass-card compact chat-card">
+            {chatReady ? (
+              <ChatBox />
+            ) : (
+              <div className="chat-placeholder">
+                <div className="placeholder-icon">🤖</div>
 
-        </section>
-      )}
+                <h3>AI Assistant Locked</h3>
 
-      {indexed && (
-        <section
-          ref={chatRef}
-          className="glass-card fade"
-        >
+                <p>
+                  {!projectReady
+                    ? "Upload a ZIP or import a GitHub repository to get started."
+                    : "Now index your project to unlock the chat assistant."}
+                </p>
 
-          <div className="step">
-            🤖 AI Assistant Ready
+                <div className="placeholder-steps">
+                  <div className={`step-pill ${projectReady ? "done" : ""}`}>
+                    {projectReady ? "✅" : "1️⃣"} Load Project
+                  </div>
+                  <div className={`step-pill ${indexed ? "done" : ""}`}>
+                    {indexed ? "✅" : "2️⃣"} Build Index
+                  </div>
+                  <div className="step-pill">3️⃣ Chat</div>
+                </div>
+              </div>
+            )}
           </div>
-
-          <ChatBox />
-
-        </section>
-      )}
-
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FaRobot, FaUser, FaPaperPlane, FaTrash } from "react-icons/fa";
+import ReactMarkdown from "react-markdown";
 import api from "../api/api";
 
 function ChatBox() {
@@ -7,12 +9,27 @@ function ChatBox() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages, loading]);
+
   async function handleAsk() {
+    if (!question.trim()) return;
+
     const text = question.trim();
 
-    if (!text) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        text,
+      },
+    ]);
 
-    setMessages((prev) => [...prev, { role: "user", text }]);
     setQuestion("");
     setLoading(true);
     setError("");
@@ -31,18 +48,19 @@ function ChatBox() {
         },
       ]);
     } catch (err) {
-      setError(err.response?.data?.detail || "Something went wrong.");
+      setError(
+        err.response?.data?.detail ||
+          "Something went wrong."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleClearChat() {
+  async function handleClear() {
     try {
       await api.post("/api/chat/clear");
-    } catch (err) {
-      console.log(err);
-    }
+    } catch {}
 
     setMessages([]);
     setError("");
@@ -56,89 +74,175 @@ function ChatBox() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">
-          💬 Chat with Your Codebase
-        </h2>
+    <div className="chat-wrapper">
+
+      <div className="chat-header">
+
+        <div>
+
+          <h2>🤖 AI Code Mentor</h2>
+
+          <p>
+            Ask anything about your codebase
+          </p>
+
+        </div>
 
         {messages.length > 0 && (
+
           <button
-            onClick={handleClearChat}
-            className="text-xs border border-gray-300 rounded-md px-3 py-1 hover:text-red-600 hover:border-red-400"
+            onClick={handleClear}
+            className="clear-btn"
           >
-            🗑 Clear Chat
+            <FaTrash />
           </button>
+
         )}
+
       </div>
 
-      <div className="h-80 overflow-y-auto border rounded-md p-3 bg-gray-50 mb-4 flex flex-col gap-3">
+      <div className="chat-body">
+
         {messages.length === 0 && (
-          <p className="text-sm text-gray-400 text-center mt-10">
-            Ask a question about your project.
-          </p>
+
+          <div className="welcome-card">
+
+            <FaRobot size={50} />
+
+            <h3>Ready to help!</h3>
+
+            <p>
+              Try asking:
+
+            </p>
+
+            <ul>
+
+              <li>
+                Explain authentication flow
+              </li>
+
+              <li>
+                Where is API configured?
+              </li>
+
+              <li>
+                Summarize this project
+              </li>
+
+            </ul>
+
+          </div>
+
         )}
 
         {messages.map((msg, index) => (
+
           <div
             key={index}
-            className={`flex ${
-              msg.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={
+              msg.role === "user"
+                ? "message user"
+                : "message ai"
+            }
           >
-            <div
-              className={`max-w-[80%] px-4 py-2 rounded-lg text-sm whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-none"
-                  : "bg-gray-200 text-gray-800 rounded-bl-none"
-              }`}
-            >
-              {msg.text}
 
-              {msg.role === "ai" &&
-                msg.sources &&
-                msg.sources.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-500">
-                    Sources: {msg.sources.join(", ")}
-                  </div>
-                )}
+            <div className="avatar">
+
+              {msg.role === "user"
+                ? <FaUser />
+                : <FaRobot />}
+
             </div>
+
+            <div className="bubble">
+
+              <ReactMarkdown>
+
+                {msg.text}
+
+              </ReactMarkdown>
+
+              {msg.sources?.length > 0 && (
+
+                <div className="sources">
+
+                  {msg.sources.map((src, i) => (
+
+                    <span
+                      key={i}
+                      className="source-chip"
+                    >
+                      {src}
+                    </span>
+
+                  ))}
+
+                </div>
+
+              )}
+
+            </div>
+
           </div>
+
         ))}
 
         {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm">
-              Thinking...
+
+          <div className="message ai">
+
+            <div className="avatar">
+              <FaRobot />
             </div>
+
+            <div className="typing">
+
+              <span></span>
+              <span></span>
+              <span></span>
+
+            </div>
+
           </div>
+
         )}
+
+        <div ref={chatEndRef}></div>
+
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 mb-3">
+
+        <div className="alert error">
           {error}
-        </p>
+        </div>
+
       )}
 
-      <div className="flex gap-2">
+      <div className="chat-input">
+
         <textarea
+          rows="1"
           value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          onChange={(e) =>
+            setQuestion(e.target.value)
+          }
           onKeyDown={handleKeyDown}
-          rows={1}
-          placeholder="Ask your question..."
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="Ask about your project..."
         />
 
         <button
           onClick={handleAsk}
-          disabled={loading || !question.trim()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-400"
+          disabled={loading}
         >
-          Send
+
+          <FaPaperPlane />
+
         </button>
+
       </div>
+
     </div>
   );
 }

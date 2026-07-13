@@ -9,14 +9,17 @@ function UploadZip({ onProjectLoaded }) {
   const [files, setFiles] = useState([]);
 
   function handleFileChange(e) {
+    if (!e.target.files.length) return;
+
     setFile(e.target.files[0]);
-    setMessage("");
     setFiles([]);
+    setMessage("");
+    setError(false);
   }
 
   async function handleUpload() {
     if (!file) {
-      setMessage("Please select a ZIP file.");
+      setMessage("Please choose a ZIP file.");
       setError(true);
       return;
     }
@@ -35,19 +38,14 @@ function UploadZip({ onProjectLoaded }) {
         },
       });
 
-      setMessage(
-        `${res.data.message} (${res.data.total_files} files loaded)`
-      );
-
+      setMessage(`Uploaded (${res.data.total_files} files)`);
       setFiles(res.data.files);
 
       if (onProjectLoaded) {
         onProjectLoaded(res.data.files);
       }
     } catch (err) {
-      setMessage(
-        err.response?.data?.detail || "Failed to upload ZIP file."
-      );
+      setMessage(err.response?.data?.detail || "Failed to upload ZIP.");
       setError(true);
     } finally {
       setLoading(false);
@@ -55,56 +53,59 @@ function UploadZip({ onProjectLoaded }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
-        📦 Upload Project ZIP
-      </h2>
+    <div>
+      <h3 className="upload-title">📦 Upload ZIP Project</h3>
 
-      <div className="flex items-center gap-3 mb-4">
-        <input
-          type="file"
-          accept=".zip"
-          onChange={handleFileChange}
-          className="text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
+      <label className="drop-zone">
+        <input type="file" accept=".zip" hidden onChange={handleFileChange} />
 
-        <button
-          onClick={handleUpload}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          {loading ? "Uploading..." : "Upload"}
-        </button>
-      </div>
+        <div className="upload-icon">📂</div>
+        <h4>Drag & Drop ZIP File</h4>
+        <p>or click to browse</p>
+      </label>
+
+      {file && (
+        <div className="selected-file">
+          <div>
+            <strong>{file.name}</strong>
+            <p>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+          </div>
+          <div>✅</div>
+        </div>
+      )}
+
+      <button className="upload-btn" disabled={loading} onClick={handleUpload}>
+        {loading ? (
+          <>
+            <span className="loader"></span>
+            Uploading...
+          </>
+        ) : (
+          <>🚀 Upload Project</>
+        )}
+      </button>
 
       {message && (
-        <p
-          className={`text-sm mb-3 ${
-            error ? "text-red-600" : "text-green-600"
-          }`}
-        >
+        <div className={error ? "alert error" : "alert success"}>
           {message}
-        </p>
+        </div>
       )}
 
       {files.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">
-            Loaded Files ({files.length})
-          </h3>
+        <div className="files-card">
+          <h4>Files ({files.length})</h4>
 
-          <div className="max-h-64 overflow-y-auto border rounded-md p-2 bg-gray-50">
-            {files.map((item, index) => (
-              <div
-                key={index}
-                className="flex justify-between text-xs text-gray-600 py-1 border-b last:border-b-0"
-              >
-                <span>{item.path}</span>
-                <span className="text-gray-400">
-                  {item.lines} lines
-                </span>
+          <div className="files-list">
+            {files.slice(0, 8).map((item, index) => (
+              <div key={index} className="file-row">
+                <span>📄 {item.path}</span>
+                <span>{item.lines} ln</span>
               </div>
             ))}
+
+            {files.length > 8 && (
+              <div className="more-files">+ {files.length - 8} more...</div>
+            )}
           </div>
         </div>
       )}
