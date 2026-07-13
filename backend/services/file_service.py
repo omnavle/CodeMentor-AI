@@ -3,69 +3,81 @@ import stat
 import shutil
 import zipfile
 
-# Folder where we extract and keep the currently loaded project
-WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "..", "workspace", "current_project")
-WORKSPACE_DIR = os.path.abspath(WORKSPACE_DIR)
+WORKSPACE_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "workspace", "current_project")
+)
 
-# Folder names we should completely skip while reading files
 IGNORE_DIRS = {
-    "node_modules", ".git", "venv", "env", ".venv",
-    "__pycache__", "dist", "build", ".next", "target",
-    ".idea", ".vscode", "coverage",
+    "node_modules",
+    ".git",
+    "venv",
+    "env",
+    ".venv",
+    "__pycache__",
+    "dist",
+    "build",
+    ".next",
+    "target",
+    ".idea",
+    ".vscode",
+    "coverage",
 }
 
-# Only read files with these extensions (source code + docs/config)
 ALLOWED_EXTENSIONS = {
-    ".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".c", ".cpp", ".h", ".hpp",
-    ".go", ".rb", ".php", ".cs", ".rs", ".kt", ".swift", ".html", ".css",
-    ".json", ".md", ".txt", ".yml", ".yaml",
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".go",
+    ".rb",
+    ".php",
+    ".cs",
+    ".rs",
+    ".kt",
+    ".swift",
+    ".html",
+    ".css",
+    ".json",
+    ".md",
+    ".txt",
+    ".yml",
+    ".yaml",
 }
 
-# Skip files larger than this (in bytes) to avoid huge/binary files
-MAX_FILE_SIZE_BYTES = 500_000  # ~500 KB
+MAX_FILE_SIZE = 500000
 
 
-def _remove_readonly(func, path, exc_info):
-    """
-    Error handler for shutil.rmtree on Windows.
-
-    Git marks some files inside .git/objects as read-only.
-    When rmtree tries to delete them, Windows blocks it with
-    PermissionError. This handler removes the read-only flag
-    and retries the delete operation.
-    """
+def remove_readonly(func, path, exc_info):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
 
 def clear_workspace():
-    """
-    Deletes any previously loaded project so we always
-    start fresh with the newly uploaded/imported project.
-    """
     if os.path.exists(WORKSPACE_DIR):
-        shutil.rmtree(WORKSPACE_DIR, onerror=_remove_readonly)
+        shutil.rmtree(WORKSPACE_DIR, onerror=remove_readonly)
+
     os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
 
-def extract_zip(zip_path: str):
-    """
-    Extracts the given ZIP file into the workspace directory.
-    """
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(WORKSPACE_DIR)
+def extract_zip(zip_path):
+    with zipfile.ZipFile(zip_path, "r") as zip_file:
+        zip_file.extractall(WORKSPACE_DIR)
 
 
-def is_allowed_file(file_path: str) -> bool:
-    """
-    Checks whether a file should be read, based on its extension and size.
-    """
+def is_allowed_file(file_path):
     _, ext = os.path.splitext(file_path)
+
     if ext.lower() not in ALLOWED_EXTENSIONS:
         return False
 
     try:
-        if os.path.getsize(file_path) > MAX_FILE_SIZE_BYTES:
+        if os.path.getsize(file_path) > MAX_FILE_SIZE:
             return False
     except OSError:
         return False
@@ -74,18 +86,13 @@ def is_allowed_file(file_path: str) -> bool:
 
 
 def read_project_files():
-    """
-    Walks through the workspace directory, skips ignored folders,
-    and returns metadata (path, size, lines) about every valid source file.
-    Does NOT include file content -- kept lightweight for quick listing.
-    """
-    files_info = []
+    files_data = []
 
     for root, dirs, files in os.walk(WORKSPACE_DIR):
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
 
-        for file_name in files:
-            full_path = os.path.join(root, file_name)
+        for file in files:
+            full_path = os.path.join(root, file)
 
             if not is_allowed_file(full_path):
                 continue
@@ -95,30 +102,28 @@ def read_project_files():
             try:
                 with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-            except Exception:
+            except:
                 continue
 
-            files_info.append({
-                "path": relative_path.replace("\\", "/"),
-                "size_bytes": os.path.getsize(full_path),
-                "lines": len(content.splitlines()),
-            })
+            files_data.append(
+                {
+                    "path": relative_path.replace("\\", "/"),
+                    "size_bytes": os.path.getsize(full_path),
+                    "lines": len(content.splitlines()),
+                }
+            )
 
-    return files_info
+    return files_data
 
 
 def read_project_files_with_content():
-    """
-    Same as read_project_files(), but also includes the full text content
-    of each file. Used by the RAG pipeline to actually index the code.
-    """
-    files_info = []
+    files_data = []
 
     for root, dirs, files in os.walk(WORKSPACE_DIR):
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
 
-        for file_name in files:
-            full_path = os.path.join(root, file_name)
+        for file in files:
+            full_path = os.path.join(root, file)
 
             if not is_allowed_file(full_path):
                 continue
@@ -128,16 +133,17 @@ def read_project_files_with_content():
             try:
                 with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-            except Exception:
+            except:
                 continue
 
-            # Skip empty files -- nothing useful to embed
             if not content.strip():
                 continue
 
-            files_info.append({
-                "path": relative_path.replace("\\", "/"),
-                "content": content,
-            })
+            files_data.append(
+                {
+                    "path": relative_path.replace("\\", "/"),
+                    "content": content,
+                }
+            )
 
-    return files_info
+    return files_data
