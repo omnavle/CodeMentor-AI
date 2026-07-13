@@ -1,15 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "./api/api";
+
 import UploadZip from "./components/UploadZip";
 import ImportGithub from "./components/ImportGithub";
 import IndexProject from "./components/IndexProject";
 import ChatBox from "./components/ChatBox";
 
+import "./App.css";
+
 function App() {
-  const [status, setStatus] = useState("Checking backend...");
+  const [status, setStatus] = useState("Connecting...");
   const [connected, setConnected] = useState(false);
+
   const [files, setFiles] = useState([]);
   const [indexed, setIndexed] = useState(false);
+
+  const indexRef = useRef(null);
+  const chatRef = useRef(null);
 
   useEffect(() => {
     async function checkBackend() {
@@ -18,7 +25,7 @@ function App() {
         setStatus(res.data.message);
         setConnected(true);
       } catch {
-        setStatus("Backend connection failed.");
+        setStatus("Backend Offline");
         setConnected(false);
       }
     }
@@ -29,45 +36,150 @@ function App() {
   function handleProjectLoaded(projectFiles) {
     setFiles(projectFiles);
     setIndexed(false);
+
+    setTimeout(() => {
+      indexRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 500);
   }
 
   function handleIndexed() {
     setIndexed(true);
+
+    setTimeout(() => {
+      chatRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 700);
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center gap-6 py-10 px-4">
-      <h1 className="text-3xl font-bold text-gray-800">
-        🤖 AI Code Mentor
-      </h1>
+    <div className="app">
 
-      <div
-        className={`px-6 py-3 rounded-lg shadow-md text-lg font-medium ${
-          connected
-            ? "bg-green-100 text-green-700 border border-green-400"
-            : "bg-red-100 text-red-700 border border-red-400"
-        }`}
-      >
-        {status}
-      </div>
+      <div className="blob blob1"></div>
+      <div className="blob blob2"></div>
+      <div className="blob blob3"></div>
 
-      <UploadZip onProjectLoaded={handleProjectLoaded} />
+      <section className="hero">
 
-      <div className="text-sm text-gray-400">OR</div>
+        <div className="hero-badge">
+          AI Powered RAG Assistant
+        </div>
 
-      <ImportGithub onProjectLoaded={handleProjectLoaded} />
+        <h1>
+          AI Code Mentor
+        </h1>
+
+        <p>
+          Upload a ZIP or Import any Public GitHub Repository.
+          <br />
+          Build embeddings and chat with your code using AI.
+        </p>
+
+        <div
+          className={`status ${
+            connected ? "online" : "offline"
+          }`}
+        >
+          {connected ? "🟢" : "🔴"} {status}
+        </div>
+
+      </section>
+
+      <section className="features">
+
+        <div className="feature-card">
+          ⚡
+          <h3>AI Powered</h3>
+          <p>Gemini + LangChain</p>
+        </div>
+
+        <div className="feature-card">
+          📂
+          <h3>ZIP Upload</h3>
+          <p>Import any project</p>
+        </div>
+
+        <div className="feature-card">
+          🌐
+          <h3>GitHub Import</h3>
+          <p>Clone public repositories</p>
+        </div>
+
+        <div className="feature-card">
+          🧠
+          <h3>Semantic Search</h3>
+          <p>Powered by RAG</p>
+        </div>
+
+      </section>
+
+      <section className="glass-card">
+
+        <h2>Choose Your Project</h2>
+
+        <UploadZip onProjectLoaded={handleProjectLoaded} />
+
+        <div className="divider">
+          <span>OR</span>
+        </div>
+
+        <ImportGithub onProjectLoaded={handleProjectLoaded} />
+
+      </section>
 
       {files.length > 0 && (
-        <>
-          <p className="text-sm text-gray-500">
-            {files.length} files loaded and ready to index
-          </p>
+        <section
+          ref={indexRef}
+          className="glass-card fade"
+        >
+
+          <div className="step">
+            ✅ Project Loaded
+          </div>
+
+          <div className="summary">
+
+            <div>
+              <h3>{files.length}</h3>
+              <p>Files</p>
+            </div>
+
+            <div>
+              <h3>Ready</h3>
+              <p>Status</p>
+            </div>
+
+            <div>
+              <h3>AI</h3>
+              <p>Embeddings</p>
+            </div>
+
+          </div>
 
           <IndexProject onIndexed={handleIndexed} />
-        </>
+
+        </section>
       )}
 
-      {indexed && <ChatBox />}
+      {indexed && (
+        <section
+          ref={chatRef}
+          className="glass-card fade"
+        >
+
+          <div className="step">
+            🤖 AI Assistant Ready
+          </div>
+
+          <ChatBox />
+
+        </section>
+      )}
+
     </div>
   );
 }
