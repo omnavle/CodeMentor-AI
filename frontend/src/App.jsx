@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import api from "./api/api";
+import UploadZip from "./components/UploadZip";
 
 function App() {
   const [status, setStatus] = useState("Checking backend connection...");
   const [isConnected, setIsConnected] = useState(false);
+  const [projectFiles, setProjectFiles] = useState([]);
 
   useEffect(() => {
-    // Call the FastAPI health check endpoint when the app loads
     const checkBackend = async () => {
       try {
         const response = await api.get("/api/health");
@@ -21,11 +22,13 @@ function App() {
     checkBackend();
   }, []);
 
+  const handleProjectLoaded = (files) => {
+    setProjectFiles(files);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
-      <h1 className="text-3xl font-bold text-gray-800 mb-4">
-        🤖 AI Code Mentor
-      </h1>
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10 px-4 gap-6">
+      <h1 className="text-3xl font-bold text-gray-800">🤖 AI Code Mentor</h1>
 
       <div
         className={`px-6 py-3 rounded-lg shadow-md text-lg font-medium ${
@@ -37,9 +40,13 @@ function App() {
         {status}
       </div>
 
-      <p className="mt-6 text-gray-500 text-sm">
-        Milestone 1: Frontend ↔ Backend Connection Test
-      </p>
+      <UploadZip onProjectLoaded={handleProjectLoaded} />
+
+      {projectFiles.length > 0 && (
+        <p className="text-sm text-gray-500">
+          ✅ {projectFiles.length} files ready to be indexed (coming in a later milestone)
+        </p>
+      )}
     </div>
   );
 }
