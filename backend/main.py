@@ -13,6 +13,7 @@ from services.file_service import (
     read_project_files,
 )
 from services.github_service import clone_github_repo
+from services.rag_service import build_vector_store
 
 # Load environment variables from .env file
 load_dotenv()
@@ -122,4 +123,28 @@ def list_current_files():
         "status": "success",
         "total_files": len(files_info),
         "files": files_info,
+    }
+
+
+@app.post("/api/index-project")
+def index_project():
+    """
+    Runs the full RAG indexing pipeline on the currently loaded project:
+    reads files -> splits into chunks -> embeds -> stores in ChromaDB.
+    """
+    try:
+        result = build_vector_store()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Indexing failed: {str(e)}",
+        )
+
+    return {
+        "status": "success",
+        "message": "Project indexed successfully",
+        "total_files": result["total_files"],
+        "total_chunks": result["total_chunks"],
     }

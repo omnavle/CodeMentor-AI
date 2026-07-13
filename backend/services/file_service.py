@@ -62,12 +62,12 @@ def is_allowed_file(file_path: str) -> bool:
 def read_project_files():
     """
     Walks through the workspace directory, skips ignored folders,
-    and returns metadata about every valid source file found.
+    and returns metadata (path, size, lines) about every valid source file.
+    Does NOT include file content -- kept lightweight for quick listing.
     """
     files_info = []
 
     for root, dirs, files in os.walk(WORKSPACE_DIR):
-        # Modify dirs in-place to skip ignored folders during os.walk
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
 
         for file_name in files:
@@ -76,7 +76,6 @@ def read_project_files():
             if not is_allowed_file(full_path):
                 continue
 
-            # Path relative to workspace, so it looks clean (e.g. "src/App.jsx")
             relative_path = os.path.relpath(full_path, WORKSPACE_DIR)
 
             try:
@@ -86,9 +85,45 @@ def read_project_files():
                 continue
 
             files_info.append({
-                "path": relative_path.replace("\\", "/"),  # normalize Windows paths
+                "path": relative_path.replace("\\", "/"),
                 "size_bytes": os.path.getsize(full_path),
                 "lines": len(content.splitlines()),
+            })
+
+    return files_info
+
+
+def read_project_files_with_content():
+    """
+    Same as read_project_files(), but also includes the full text content
+    of each file. Used by the RAG pipeline to actually index the code.
+    """
+    files_info = []
+
+    for root, dirs, files in os.walk(WORKSPACE_DIR):
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
+
+        for file_name in files:
+            full_path = os.path.join(root, file_name)
+
+            if not is_allowed_file(full_path):
+                continue
+
+            relative_path = os.path.relpath(full_path, WORKSPACE_DIR)
+
+            try:
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+            except Exception:
+                continue
+
+            # Skip empty files -- nothing useful to embed
+            if not content.strip():
+                continue
+
+            files_info.append({
+                "path": relative_path.replace("\\", "/"),
+                "content": content,
             })
 
     return files_info
