@@ -6,132 +6,98 @@ from langgraph.graph import StateGraph, END
 
 from services.rag_service import search_relevant_chunks
 
-# Free, fast Groq model. Good balance of speed and quality for code Q&A.
-GROQ_MODEL_NAME = "llama-3.1-8b-instant"
+MODEL_NAME = "llama-3.1-8b-instant"
+MAX_HISTORY = 10
 
-# Maximum number of past messages (user + AI combined) to keep in history.
-# Keeps the prompt from growing too large over a long conversation.
-MAX_HISTORY_MESSAGES = 10
-
-# We keep a single shared LLM object so we don't recreate it on every request.
-_llm = None
-
-# Simple in-memory conversation history (list of {"role": "user"/"ai", "text": "..."})
-# Since this app has no login system, we keep ONE conversation at a time --
-# matching how we already keep ONE active project at a time.
-conversation_history: List[dict] = []
+llm = None
+chat_history = []
 
 
 def get_llm():
-    """
-    Returns a shared ChatGroq instance.
-    Reads the API key from the GROQ_API_KEY environment variable.
-    """
-    global _llm
-    if _llm is None:
+    global llm
+
+    if llm is None:
         api_key = os.getenv("GROQ_API_KEY")
+
         if not api_key:
-            raise ValueError(
-                "GROQ_API_KEY is missing. Please add it to your .env file."
-            )
-        _llm = ChatGroq(
-            model=GROQ_MODEL_NAME,
+            raise ValueError("GROQ_API_KEY not found.")
+
+        llm = ChatGroq(
+            model=MODEL_NAME,
             api_key=api_key,
             temperature=0.2,
         )
-    return _llm
 
+    return llm
 
-# ---------------------------------------------------------------------------
-# LangGraph Setup
-#
-# Our workflow has exactly 2 steps ("nodes"):
-#   1. retrieve_node  -> searches ChromaDB for relevant code chunks
-#   2. generate_node  -> builds a prompt (code + history + question) and
-#                        calls Groq to generate the final answer
-#
-# The "state" is just a dictionary that gets passed from node to node,
-# each node reads from it and adds new data to it.
-# ---------------------------------------------------------------------------
 
 class ChatState(TypedDict):
-    question: str          # the user's current question
-    history: List[dict]    # past conversation messages
-    context: str           # retrieved code context (filled in by retrieve_node)
-    sources: List[str]     # which files the context came from
-    answer: str            # final AI answer (filled in by generate_node)
+    question: str
+    history: List[dict]
+    context: str
+    sources: List[str]
+    answer: str
 
 
-def retrieve_node(state: ChatState) -> ChatState:
-    """
-    Step 1: Search ChromaDB for code chunks relevant to the question.
-    """
+def retrieve_node(state: ChatState):
     chunks = search_relevant_chunks(state["question"], k=4)
 
-    if len(chunks) == 0:
+    if not chunks:
         state["context"] = ""
         state["sources"] = []
         return state
 
-    context_parts = []
+    context = []
     sources = []
-    for chunk in chunks:
-        source = chunk.metadata.get("source", "unknown file")
-        context_parts.append(f"--- File: {source} ---\n{chunk.page_content}")
-        sources.append(source)
 
-    state["context"] = "\n\n".join(context_parts)
-    state["sources"] = list(dict.fromkeys(sources))  # unique, keeps order
+    for chunk in chunks:
+        file_name = chunk.metadata.get("source", "Unknown File")
+        context.append(f"File: {file_name}\n{chunk.page_content}")
+        sources.append(file_name)
+
+    state["context"] = "\n\n".join(context)
+    state["sources"] = list(dict.fromkeys(sources))
+
     return state
 
 
-def generate_node(state: ChatState) -> ChatState:
-    """
-    Step 2: Build a prompt using the retrieved code + past conversation,
-    then call Groq to generate the final answer.
-    """
-    if not state["context"]:
-        state["answer"] = "I couldn't find any relevant code for this question."
+def generate_node(state: ChatState):
+    if state["context"] == "":
+        state["answer"] = "I couldn't find any related code."
         return state
 
-    # Format past conversation into simple readable text
     history_text = ""
-    for msg in state["history"]:
-        role_label = "User" if msg["role"] == "user" else "AI Mentor"
-        history_text += f"{role_label}: {msg['text']}\n"
 
-    prompt = f"""You are an AI Code Mentor. You help developers understand a codebase
-by answering questions using ONLY the code context provided below.
+    for message in state["history"]:
+        if message["role"] == "user":
+            history_text += f"User: {message['text']}\n"
+        else:
+            history_text += f"AI: {message['text']}\n"
 
-Rules:
-- Base your answer strictly on the given code context.
-- If the answer isn't in the context, say you don't have enough information.
-- When relevant, mention which file(s) your answer is based on.
-- Use the conversation history to understand follow-up questions
-  (e.g. "explain that in more detail" or "what about the other function?").
-- Explain things clearly and simply, like a helpful senior developer mentoring a junior.
+    prompt = f"""
+You are an AI Code Mentor.
 
-Conversation so far:
-{history_text if history_text else "(no previous messages)"}
+Use only the code below to answer the question.
 
-Code Context:
-{state['context']}
+Conversation:
+{history_text}
 
-Current Question: {state['question']}
+Code:
+{state["context"]}
 
-Answer:"""
+Question:
+{state["question"]}
 
-    llm = get_llm()
-    response = llm.invoke(prompt)
+Answer:
+"""
+
+    response = get_llm().invoke(prompt)
     state["answer"] = response.content
+
     return state
 
 
 def build_chat_graph():
-    """
-    Builds and compiles the LangGraph workflow:
-    retrieve_node -> generate_node -> END
-    """
     graph = StateGraph(ChatState)
 
     graph.add_node("retrieve", retrieve_node)
@@ -144,37 +110,36 @@ def build_chat_graph():
     return graph.compile()
 
 
-# Compile the graph once when the module loads, reuse it for every request
 chat_graph = build_chat_graph()
 
 
-# ---------------------------------------------------------------------------
-# Public functions used by main.py
-# ---------------------------------------------------------------------------
-
 def ask_question(question: str):
-    """
-    Runs the LangGraph workflow for a single question, using the
-    current conversation history, then updates the history with
-    the new question + answer.
-    """
-    initial_state: ChatState = {
+    state = {
         "question": question,
-        "history": conversation_history,
+        "history": chat_history,
         "context": "",
         "sources": [],
         "answer": "",
     }
 
-    result = chat_graph.invoke(initial_state)
+    result = chat_graph.invoke(state)
 
-    # Update the shared conversation history
-    conversation_history.append({"role": "user", "text": question})
-    conversation_history.append({"role": "ai", "text": result["answer"]})
+    chat_history.append(
+        {
+            "role": "user",
+            "text": question,
+        }
+    )
 
-    # Keep history from growing forever -- only keep the last N messages
-    if len(conversation_history) > MAX_HISTORY_MESSAGES:
-        del conversation_history[: len(conversation_history) - MAX_HISTORY_MESSAGES]
+    chat_history.append(
+        {
+            "role": "ai",
+            "text": result["answer"],
+        }
+    )
+
+    if len(chat_history) > MAX_HISTORY:
+        chat_history[:] = chat_history[-MAX_HISTORY:]
 
     return {
         "answer": result["answer"],
@@ -183,15 +148,8 @@ def ask_question(question: str):
 
 
 def clear_conversation_history():
-    """
-    Clears the in-memory conversation history.
-    Called when the user clicks "Clear Chat" or loads a new project.
-    """
-    conversation_history.clear()
+    chat_history.clear()
 
 
 def get_conversation_history():
-    """
-    Returns the current conversation history.
-    """
-    return conversation_history
+    return chat_history
