@@ -2,65 +2,63 @@ import { useState } from "react";
 import api from "../api/api";
 
 function IndexProject({ onIndexed }) {
-  const [isIndexing, setIsIndexing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState(false);
 
-  const handleIndex = async () => {
-    setIsIndexing(true);
+  async function handleIndex() {
+    setLoading(true);
     setMessage("");
-    setIsError(false);
+    setError(false);
 
     try {
-      const response = await api.post("/api/index-project");
+      const res = await api.post("/api/index-project");
 
       setMessage(
-        `${response.data.message} — ${response.data.total_files} files, ${response.data.total_chunks} chunks embedded`
+        `${res.data.message} - ${res.data.total_files} files, ${res.data.total_chunks} chunks created`
       );
-      setIsError(false);
 
       if (onIndexed) {
         onIndexed();
       }
-    } catch (error) {
-      const errorMsg =
-        error.response?.data?.detail || "Failed to index the project.";
-      setMessage(errorMsg);
-      setIsError(true);
+    } catch (err) {
+      setMessage(
+        err.response?.data?.detail || "Failed to index project."
+      );
+      setError(true);
     } finally {
-      setIsIndexing(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl">
       <h2 className="text-xl font-semibold text-gray-800 mb-2">
-        🧠 Build AI Index (RAG)
+        🧠 Build AI Index
       </h2>
+
       <p className="text-sm text-gray-500 mb-4">
-        This reads your project, splits it into chunks, creates embeddings,
-        and stores them so you can chat with your code.
+        Create embeddings for your project so you can chat with your code.
       </p>
 
       <button
         onClick={handleIndex}
-        disabled={isIndexing}
-        className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 disabled:bg-gray-400"
+        disabled={loading}
+        className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 disabled:bg-gray-400"
       >
-        {isIndexing ? "Indexing... please wait" : "Index Project"}
+        {loading ? "Indexing..." : "Index Project"}
       </button>
 
-      {isIndexing && (
+      {loading && (
         <p className="text-xs text-gray-400 mt-2">
-          First-time indexing downloads the embedding model — this may take a
-          minute.
+          Please wait while the project is being indexed.
         </p>
       )}
 
       {message && (
         <p
           className={`text-sm mt-3 ${
-            isError ? "text-red-600" : "text-green-600"
+            error ? "text-red-600" : "text-green-600"
           }`}
         >
           {message}
