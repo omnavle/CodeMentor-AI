@@ -1,22 +1,25 @@
 import os
-from typing import TypedDict, List
 
 from langchain_groq import ChatGroq
-from langgraph.graph import StateGraph, END
-
 from services.rag_service import search_relevant_chunks
 
+# AI Model Name
 MODEL_NAME = "llama-3.1-8b-instant"
-MAX_HISTORY = 10
 
-llm = None
+# Save previous chat messages
 chat_history = []
 
+# Store AI model
+llm = None
 
+
+# Create AI model only once
 def get_llm():
+
     global llm
 
     if llm is None:
+
         api_key = os.getenv("GROQ_API_KEY")
 
         if not api_key:
@@ -31,125 +34,94 @@ def get_llm():
     return llm
 
 
-class ChatState(TypedDict):
-    question: str
-    history: List[dict]
-    context: str
-    sources: List[str]
-    answer: str
+# Ask question to AI
+def ask_question(question):
 
+    # Search related code from vector database
+    chunks = search_relevant_chunks(question, k=4)
 
-def retrieve_node(state: ChatState):
-    chunks = search_relevant_chunks(state["question"], k=4)
+    # No code found
+    if len(chunks) == 0:
 
-    if not chunks:
-        state["context"] = ""
-        state["sources"] = []
-        return state
+        return {
+            "answer": "I couldn't find any related code.",
+            "sources": [],
+        }
 
-    context = []
+    context = ""
     sources = []
 
+    # Create context for AI
     for chunk in chunks:
+
         file_name = chunk.metadata.get("source", "Unknown File")
-        context.append(f"File: {file_name}\n{chunk.page_content}")
-        sources.append(file_name)
 
-    state["context"] = "\n\n".join(context)
-    state["sources"] = list(dict.fromkeys(sources))
+        context += f"\nFile: {file_name}\n"
+        context += chunk.page_content + "\n"
 
-    return state
+        if file_name not in sources:
+            sources.append(file_name)
 
+    # Convert previous chat into text
+    history = ""
 
-def generate_node(state: ChatState):
-    if state["context"] == "":
-        state["answer"] = "I couldn't find any related code."
-        return state
+    for message in chat_history:
 
-    history_text = ""
-
-    for message in state["history"]:
         if message["role"] == "user":
-            history_text += f"User: {message['text']}\n"
+            history += f"User: {message['text']}\n"
         else:
-            history_text += f"AI: {message['text']}\n"
+            history += f"AI: {message['text']}\n"
 
+    # Prompt for AI
     prompt = f"""
 You are an AI Code Mentor.
 
-Use only the code below to answer the question.
+Use only the given code to answer.
 
-Conversation:
-{history_text}
+Previous Conversation:
+{history}
 
 Code:
-{state["context"]}
+{context}
 
 Question:
-{state["question"]}
+{question}
 
 Answer:
 """
 
+    # Get AI response
     response = get_llm().invoke(prompt)
-    state["answer"] = response.content
 
-    return state
+    answer = response.content
 
+    # Save user question
+    chat_history.append({
+        "role": "user",
+        "text": question,
+    })
 
-def build_chat_graph():
-    graph = StateGraph(ChatState)
+    # Save AI answer
+    chat_history.append({
+        "role": "ai",
+        "text": answer,
+    })
 
-    graph.add_node("retrieve", retrieve_node)
-    graph.add_node("generate", generate_node)
-
-    graph.set_entry_point("retrieve")
-    graph.add_edge("retrieve", "generate")
-    graph.add_edge("generate", END)
-
-    return graph.compile()
-
-
-chat_graph = build_chat_graph()
-
-
-def ask_question(question: str):
-    state = {
-        "question": question,
-        "history": chat_history,
-        "context": "",
-        "sources": [],
-        "answer": "",
-    }
-
-    result = chat_graph.invoke(state)
-
-    chat_history.append(
-        {
-            "role": "user",
-            "text": question,
-        }
-    )
-
-    chat_history.append(
-        {
-            "role": "ai",
-            "text": result["answer"],
-        }
-    )
-
-    if len(chat_history) > MAX_HISTORY:
-        chat_history[:] = chat_history[-MAX_HISTORY:]
+    # Keep only last 10 messages
+    if len(chat_history) > 10:
+        del chat_history[:-10]
 
     return {
-        "answer": result["answer"],
-        "sources": result["sources"],
+        "answer": answer,
+        "sources": sources,
     }
 
 
+# Clear all chat history
 def clear_conversation_history():
     chat_history.clear()
 
 
+# Return chat history
 def get_conversation_history():
     return chat_history

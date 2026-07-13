@@ -9,117 +9,231 @@ import ChatBox from "./components/ChatBox";
 import "./App.css";
 
 function App() {
+
+  // Backend status
   const [status, setStatus] = useState("Connecting...");
-  const [connected, setConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
+  // Store uploaded/imported files
   const [files, setFiles] = useState([]);
-  const [indexed, setIndexed] = useState(false);
 
+  // Check whether project is indexed
+  const [isIndexed, setIsIndexed] = useState(false);
+
+  // Check backend when page loads
   useEffect(() => {
-    async function checkBackend() {
+
+    async function checkBackendStatus() {
+
       try {
-        const res = await api.get("/api/health");
-        setStatus(res.data.message);
-        setConnected(true);
+
+        const response = await api.get("/api/health");
+
+        setStatus(response.data.message);
+        setIsConnected(true);
+
       } catch {
+
         setStatus("Backend Offline");
-        setConnected(false);
+        setIsConnected(false);
+
       }
+
     }
 
-    checkBackend();
+    checkBackendStatus();
+
   }, []);
 
-  function handleProjectLoaded(projectFiles) {
+  // Called after project is uploaded/imported
+  function projectLoaded(projectFiles) {
+
     setFiles(projectFiles);
-    setIndexed(false);
+
+    // Reset index status
+    setIsIndexed(false);
+
   }
 
-  function handleIndexed() {
-    setIndexed(true);
+  // Called after indexing is complete
+  function projectIndexed() {
+
+    setIsIndexed(true);
+
   }
 
+  // Check if project is loaded
   const projectReady = files.length > 0;
-  const chatReady = projectReady && indexed;
+
+  // Chat is available only after indexing
+  const chatReady = projectReady && isIndexed;
 
   return (
+
     <div className="app">
+
+      {/* Background Effects */}
+
       <div className="blob blob1"></div>
       <div className="blob blob2"></div>
       <div className="blob blob3"></div>
 
-      <header className="topbar">
-        <h1>🤖 AI Code Mentor</h1>
+      {/* Header */}
 
-        <div className={`status ${connected ? "online" : "offline"}`}>
-          {connected ? "🟢" : "🔴"} {status}
+      <header className="topbar">
+
+        <h1>🤖 CodeMentor</h1>
+
+        <div className={`status ${isConnected ? "online" : "offline"}`}>
+
+          {isConnected ? "🟢" : "🔴"} {status}
+
         </div>
+
       </header>
 
-      <section className="workspace">
-        {/* LEFT SIDE */}
-        <div className="workspace-left">
-          <div className="glass-card compact">
-            <h2 className="mini-title">Choose Your Project</h2>
+      {/* Main Content */}
 
-            <UploadZip onProjectLoaded={handleProjectLoaded} />
+      <section className="workspace">
+
+        {/* Left Side */}
+
+        <div className="workspace-left">
+
+          <div className="glass-card compact">
+
+            <h2 className="mini-title">
+
+              Choose Your Project
+
+            </h2>
+
+            {/* Upload ZIP */}
+
+            <UploadZip
+              onProjectLoaded={projectLoaded}
+            />
 
             <div className="divider small">
+
               <span>OR</span>
+
             </div>
 
-            <ImportGithub onProjectLoaded={handleProjectLoaded} />
+            {/* Import GitHub */}
+
+            <ImportGithub
+              onProjectLoaded={projectLoaded}
+            />
+
+            {/* Show only after project is loaded */}
 
             {projectReady && (
+
               <div className="mini-status fade">
+
                 <div className="mini-status-row">
+
                   <span>
+
                     📁 <strong>{files.length}</strong> Files
+
                   </span>
-                  <span className="dot-sep">•</span>
-                  <span>{indexed ? "✅ Indexed" : "⏳ Not Indexed"}</span>
-                  <span className="dot-sep">•</span>
-                  <span>🧠 AI Embeddings</span>
+
                 </div>
 
-                <IndexProject onIndexed={handleIndexed} />
+                {/* Index Project */}
+
+                <IndexProject
+                  onIndexed={projectIndexed}
+                />
+
               </div>
+
             )}
+
           </div>
+
         </div>
 
-        {/* RIGHT SIDE */}
-        <div className="workspace-right">
-          <div className="glass-card compact chat-card">
-            {chatReady ? (
-              <ChatBox />
-            ) : (
-              <div className="chat-placeholder">
-                <div className="placeholder-icon">🤖</div>
+        {/* Right Side */}
 
-                <h3>AI Assistant Locked</h3>
+        <div className="workspace-right">
+
+          <div className="glass-card compact chat-card">
+
+            {chatReady ? (
+
+              <ChatBox />
+
+            ) : (
+
+              <div className="chat-placeholder">
+
+                <div className="placeholder-icon">
+
+                  🤖
+
+                </div>
+
+                <h3>
+
+                  AI Assistant Locked
+
+                </h3>
 
                 <p>
+
                   {!projectReady
                     ? "Upload a ZIP or import a GitHub repository to get started."
                     : "Now index your project to unlock the chat assistant."}
+
                 </p>
 
+                {/* Steps */}
+
                 <div className="placeholder-steps">
-                  <div className={`step-pill ${projectReady ? "done" : ""}`}>
-                    {projectReady ? "✅" : "1️⃣"} Load Project
+
+                  <div
+                    className={`step-pill ${projectReady ? "done" : ""}`}
+                  >
+
+                    {projectReady ? "✅" : "1️⃣"}
+
+                    Load Project
+
                   </div>
-                  <div className={`step-pill ${indexed ? "done" : ""}`}>
-                    {indexed ? "✅" : "2️⃣"} Build Index
+
+                  <div
+                    className={`step-pill ${isIndexed ? "done" : ""}`}
+                  >
+
+                    {isIndexed ? "✅" : "2️⃣"}
+
+                    Build Index
+
                   </div>
-                  <div className="step-pill">3️⃣ Chat</div>
+
+                  <div className="step-pill">
+
+                    3️⃣ Chat
+
+                  </div>
+
                 </div>
+
               </div>
+
             )}
+
           </div>
+
         </div>
+
       </section>
+
     </div>
+
   );
 }
 
