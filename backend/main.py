@@ -4,6 +4,7 @@ import tempfile
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from services.file_service import (
@@ -11,6 +12,7 @@ from services.file_service import (
     extract_zip,
     read_project_files,
 )
+from services.github_service import clone_github_repo
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +28,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class GithubImportRequest(BaseModel):
+    """Request body schema for importing a GitHub repository."""
+    repo_url: str
 
 
 @app.get("/")
@@ -49,24 +56,19 @@ async def upload_zip(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed")
 
-    # Step 1: Clear any previously loaded project
     clear_workspace()
 
-    # Step 2: Save the uploaded ZIP to a temporary file on disk
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_zip:
         shutil.copyfileobj(file.file, temp_zip)
         temp_zip_path = temp_zip.name
 
     try:
-        # Step 3: Extract the ZIP into our workspace folder
         extract_zip(temp_zip_path)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to extract ZIP: {str(e)}")
     finally:
-        # Step 4: Clean up the temporary ZIP file
         os.remove(temp_zip_path)
 
-    # Step 5: Read all valid source files from the extracted project
     files_info = read_project_files()
 
     if len(files_info) == 0:
@@ -77,7 +79,34 @@ async def upload_zip(file: UploadFile = File(...)):
 
     return {
         "status": "success",
-        "message": f"Project uploaded and extracted successfully",
+        "message": "Project uploaded and extracted successfully",
+        "total_files": len(files_info),
+        "files": files_info,
+    }
+
+
+@app.post("/api/import-github")
+def import_github(request: GithubImportRequest):
+    """
+    Accepts a public GitHub repository URL, clones it,
+    and reads all valid source files inside it.
+    """
+    try:
+        clone_github_repo(request.repo_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    files_info = read_project_files()
+
+    if len(files_info) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No readable source files found in this repository",
+        )
+
+    return {
+        "status": "success",
+        "message": "Repository imported successfully",
         "total_files": len(files_info),
         "files": files_info,
     }
@@ -87,7 +116,6 @@ async def upload_zip(file: UploadFile = File(...)):
 def list_current_files():
     """
     Returns the list of files currently loaded in the workspace.
-    Useful for checking what project is currently active.
     """
     files_info = read_project_files()
     return {
