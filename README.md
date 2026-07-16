@@ -145,38 +145,6 @@ http://localhost:5173
 
 ---
 
-# AI Pipeline
-
-```
-Repository
-      │
-      ▼
-File Loader
-      │
-      ▼
-Text Splitter
-      │
-      ▼
-Embeddings
-      │
-      ▼
-ChromaDB
-      │
-      ▼
-Retriever
-      │
-      ▼
-LangChain
-      │
-      ▼
-Groq / OpenAI
-      │
-      ▼
-AI Response
-```
-
----
-
 # Screenshots
 
 ## Project Upload
