@@ -70,7 +70,7 @@ function IndexProject({ onIndexed }) {
 
       {/* Show note while indexing */}
 
-      {loading && (
+      {/* {loading && (
 
         <p className="index-note">
 
@@ -79,7 +79,7 @@ function IndexProject({ onIndexed }) {
 
         </p>
 
-      )}
+      )} */}
 
       {/* Success or Error Message */}
 
