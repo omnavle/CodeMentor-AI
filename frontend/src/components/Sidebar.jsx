@@ -8,18 +8,11 @@ import {
 } from "react-icons/fa";
 
 function Sidebar({ active, setActive, files }) {
-
   return (
-
     <div className="sidebar">
-
-      {/* Sidebar Title */}
-
       <h2>
         🤖 <span>AI Code Mentor</span>
       </h2>
-
-      {/* Upload ZIP */}
 
       <button
         className={active === "upload" ? "active" : ""}
@@ -29,8 +22,6 @@ function Sidebar({ active, setActive, files }) {
         Upload ZIP
       </button>
 
-      {/* Import GitHub Repository */}
-
       <button
         className={active === "upload" ? "active" : ""}
         onClick={() => setActive("upload")}
@@ -39,10 +30,8 @@ function Sidebar({ active, setActive, files }) {
         GitHub Repo
       </button>
 
-      {/* Project Information */}
-
       <button
-        disabled={files.length === 0}
+        disabled={!files.length}
         className={active === "project" ? "active" : ""}
         onClick={() => setActive("project")}
       >
@@ -50,10 +39,8 @@ function Sidebar({ active, setActive, files }) {
         Project Info
       </button>
 
-      {/* Build Project Index */}
-
       <button
-        disabled={files.length === 0}
+        disabled={!files.length}
         className={active === "index" ? "active" : ""}
         onClick={() => setActive("index")}
       >
@@ -61,10 +48,8 @@ function Sidebar({ active, setActive, files }) {
         Build Index
       </button>
 
-      {/* View Files */}
-
       <button
-        disabled={files.length === 0}
+        disabled={!files.length}
         className={active === "files" ? "active" : ""}
         onClick={() => setActive("files")}
       >
@@ -72,19 +57,15 @@ function Sidebar({ active, setActive, files }) {
         Files
       </button>
 
-      {/* Project Statistics */}
-
       <button
-        disabled={files.length === 0}
+        disabled={!files.length}
         className={active === "stats" ? "active" : ""}
         onClick={() => setActive("stats")}
       >
         <FaChartBar />
         Stats
       </button>
-
     </div>
-
   );
 }
 
