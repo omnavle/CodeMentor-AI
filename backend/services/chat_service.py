@@ -1,48 +1,35 @@
 import os
-
 from langchain_groq import ChatGroq
 from services.rag_service import search_relevant_chunks
 
-# AI Model Name
 MODEL_NAME = "llama-3.1-8b-instant"
 
-# Save previous chat messages
 chat_history = []
-
-# Store AI model
 llm = None
 
 
-# Create AI model only once
 def get_llm():
-
     global llm
 
-    if llm is None:
+    if llm:
+        return llm
 
-        api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY not found.")
 
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not found.")
-
-        llm = ChatGroq(
-            model=MODEL_NAME,
-            api_key=api_key,
-            temperature=0.2,
-        )
-
+    llm = ChatGroq(
+        model=MODEL_NAME,
+        api_key=api_key,
+        temperature=0.2,
+    )
     return llm
 
 
-# Ask question to AI
 def ask_question(question):
-
-    # Search related code from vector database
     chunks = search_relevant_chunks(question, k=4)
 
-    # No code found
-    if len(chunks) == 0:
-
+    if not chunks:
         return {
             "answer": "I couldn't find any related code.",
             "sources": [],
@@ -51,28 +38,19 @@ def ask_question(question):
     context = ""
     sources = []
 
-    # Create context for AI
     for chunk in chunks:
+        file = chunk.metadata.get("source", "Unknown File")
+        context += f"\nFile: {file}\n{chunk.page_content}\n"
 
-        file_name = chunk.metadata.get("source", "Unknown File")
+        if file not in sources:
+            sources.append(file)
 
-        context += f"\nFile: {file_name}\n"
-        context += chunk.page_content + "\n"
-
-        if file_name not in sources:
-            sources.append(file_name)
-
-    # Convert previous chat into text
     history = ""
 
-    for message in chat_history:
+    for msg in chat_history:
+        role = "User" if msg["role"] == "user" else "AI"
+        history += f"{role}: {msg['text']}\n"
 
-        if message["role"] == "user":
-            history += f"User: {message['text']}\n"
-        else:
-            history += f"AI: {message['text']}\n"
-
-    # Prompt for AI
     prompt = f"""
 You are an AI Code Mentor.
 
@@ -90,26 +68,14 @@ Question:
 Answer:
 """
 
-    # Get AI response
-    response = get_llm().invoke(prompt)
+    answer = get_llm().invoke(prompt).content
 
-    answer = response.content
+    chat_history.extend([
+        {"role": "user", "text": question},
+        {"role": "ai", "text": answer},
+    ])
 
-    # Save user question
-    chat_history.append({
-        "role": "user",
-        "text": question,
-    })
-
-    # Save AI answer
-    chat_history.append({
-        "role": "ai",
-        "text": answer,
-    })
-
-    # Keep only last 10 messages
-    if len(chat_history) > 10:
-        del chat_history[:-10]
+    chat_history[:] = chat_history[-10:]
 
     return {
         "answer": answer,
@@ -117,11 +83,9 @@ Answer:
     }
 
 
-# Clear all chat history
 def clear_conversation_history():
     chat_history.clear()
 
 
-# Return chat history
 def get_conversation_history():
     return chat_history
