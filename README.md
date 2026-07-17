@@ -2,7 +2,7 @@
 
 An AI-powered code understanding assistant that enables developers to upload a ZIP project or import a public GitHub repository and interact with the codebase using natural language. The application leverages Retrieval-Augmented Generation (RAG) to provide context-aware answers about source code, architecture, functions, and implementation details.
 
-Built with **React**, **FastAPI**, **LangChain**, **ChromaDB**, and **Groq/OpenAI**, the project demonstrates modern AI engineering practices, semantic code search, vector databases, and LLM integration.
+Built with **React**, **FastAPI**, **LangChain**, **ChromaDB**, and **Groq**, the project demonstrates modern AI engineering practices, semantic code search, vector databases, and LLM integration.
 
 ---
 
@@ -78,7 +78,7 @@ Built with **React**, **FastAPI**, **LangChain**, **ChromaDB**, and **Groq/OpenA
 ## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/AI-Code-Mentor.git
+git clone https://github.com/omnavle/AI-Code-Mentor.git
 
 cd AI-Code-Mentor
 ```
