@@ -1,4 +1,4 @@
-# AI Code Mentor
+# CodeMentor-AI
 
 An AI-powered code understanding assistant that enables developers to upload a ZIP project or import a public GitHub repository and interact with the codebase using natural language. The application leverages Retrieval-Augmented Generation (RAG) to provide context-aware answers about source code, architecture, functions, and implementation details.
 
